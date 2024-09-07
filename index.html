@@ -5,30 +5,53 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" user-scalable="no">
   <title>Level-Four</title>
   <link rel="stylesheet" href="./assets/index.css">
+  <script src="./assets/utils.js"></script>
 </head>
 <body>
   <div class="loading">数据加载中...</div>
-  <header class="header">
+  <header class="header" style="display: none;">
     <div class="statistic-wrap">
-      <div>正确*0</div>
-      <div>错误*0</div>
-      <div>总回答*0</div>
-      <div>总题数*0</div>
+      <div class="statistic-correct">
+        <span>正确*</span>
+        <span class="count-correct">0</span>
+      </div>
+      <div class="statistic-mistake">
+        <span>错误*</span>
+        <span class="count-mistake">0</span>
+      </div>
+      <div class="statistic-answer">
+        <span>总回答*</span>
+        <span class="count-answer">0</span>
+      </div>
+      <div class="statistic-question">
+        <span>总题数*</span>
+        <span class="count-question">0</span>
+      </div>
     </div>
     <div class="operation-wrap">
-      <div>自动下一题</div>
+      <!-- <div>自动下一题</div> -->
     </div>
     <div class=""></div>
   </header>
-  <div class="index-wrap"></div>
-  <div class="testing-wrap"></div>
-  <div class="switch-wrap">
+  <div class="index-wrap" style="display: none;"></div>
+  <div class="testing-wrap" style="display: none;"></div>
+  <div class="switch-wrap" style="display: none;">
     <div class="switch-item last-btn">上一题</div>
     <div class="switch-item next-btn">下一题</div>
   </div>
   <script>  
-    window.$ = Document.prototype.$ = Element.prototype.$ = $
-    window.$$ = Document.prototype.$$ = Element.prototype.$$ = $$
+    _ds = {
+      selIdx: 0,
+      record: [],
+      statistic: {
+        correct: 0,
+        mistake: 0,
+        answer: 0,
+        question: 0
+      },
+      correctColor: 'rgb(39, 174, 96, .5)',
+      mistakeColor: 'rgb(255, 94, 87, .5)',
+    }
 
     fetch('./testing-data/level-five.json')
     .then(res => res.json())
@@ -43,34 +66,100 @@
       })
 
       $('.loading').remove()
+      setStyle(['header', '.index-wrap', '.testing-wrap','.switch-wrap'].map(sel => $(sel)), {
+        display: null
+      })
 
       console.log(testings)
+
+      const record = testings.map((item) => {
+        return {
+          id: item.id,
+          correctIdx: item.optionList.findIndex(item => item.isCorrect),
+        }
+      })
+
+      //尝试使用缓存并校验
+      try {
+        const record_local = JSON.parse(localStorage.getItem('record'))
+        if(Array.isArray(record_local) && record.length == record_local.length) {
+          const isSame = record.every((item, idx) => {
+            for(let k in item) {
+              const compareKeys = ['id', 'correctIdx']
+              for(let i = 0; i < compareKeys.length; i++) {
+                if(compareKeys.includes(k) && record[idx][k] !== record_local[idx][k]) {
+                  return false
+                }
+              }
+            }
+            return true
+          })
+          if(isSame) {
+            _ds.record = confirm('是否使用历史记录') ? record_local : record
+          } else {
+            throw('本地数据异常')
+          }
+        } else if(record_local === null) {
+          _ds.record = record
+          localStorage.setItem('record', JSON.stringify(_ds.record))
+        } else {
+          _ds.record = record
+          throw('本地数据异常')
+        }
+      } catch(e) {
+        _ds.record = record
+        localStorage.setItem('record', JSON.stringify(_ds.record))
+
+        alert('本地数据异常，现已对数据进行重置')
+      }
+
+      statistic()
 
       const testingWarp = $('.testing-wrap')
       const indexWrap = $('.index-wrap')
 
       for(let sn = 1; sn <= testings.length; ++sn) {
+        const correctIdx = testings[sn-1].optionList.findIndex(item => item.isCorrect)
+        const selectIdx = _ds.record[sn-1].selectIdx
+
         const index = createEl('div', {
           className: 'index-item',
           innerText: sn,
-          correctIdx: testings[sn-1].optionList.findIndex(item => item.isCorrect),
+          questionId: testings[sn-1].id,
+          correctIdx: correctIdx,
           onclick: function() {
             generateTesting(sn)
+          },
+          style: {
+            background: selectIdx === void 0 ? null : 
+            _ds.record[sn-1].selectIdx === correctIdx ? _ds.correctColor : _ds.mistakeColor
           }
         })
         indexWrap.append(index)
       }
 
+      $('.last-btn').onclick = function() {
+        generateTesting(_ds.selIdx)
+      }
+
+      $('.next-btn').onclick = function() {
+        generateTesting(_ds.selIdx+2)
+      }
+
+      $$('.index-item')[0].click()
+
       function generateTesting(sn) {
-        const indexItems = $$('.index-item')
-        if(sn < 0 || sn > indexItems.length) return alert(1)
+        if(sn < 0 || sn > _ds.record.length) return
 
         const idx = sn-1
-        const correctColor = 'rgb(39, 174, 96, .5)'
-        const mistakeColor = 'rgb(255, 94, 87, .5)'
+        _ds.selIdx = idx
+        const { correctIdx, selectIdx} = _ds.record[idx]
+        const correctColor = _ds.correctColor
+        const mistakeColor = _ds.mistakeColor
         const {content, optionList} = testings[idx]
+        const indexItems = $$('.index-item')
         const index_item_map = indexItems[idx]
-        console.log(index_item_map)
+        index_item_map.scrollIntoView({ behavior: "smooth", block: "center" });
 
         $('.testing-wrap').innerHTML = ''
 
@@ -90,30 +179,47 @@
 
         questionWrap.append(questionIndex, questionInfo)
         testingWarp.append(questionWrap)
+
+        indexItems.forEach((item, idx) => {
+          const isCurrent = idx == _ds.selIdx
+          item.style.boxShadow = isCurrent ? '0px 0px 8px rgba(0, 0, 0, .12)' : null
+          item.style.textShadow = isCurrent ? '0px 0px 8px rgb(255, 255, 255)' : null
+          item.style.width = isCurrent ? '43px' : '40px'
+          item.style.height = isCurrent ? '37px' : '35px'
+          item.style.lineHeight = isCurrent ? '37px' : '35px'
+        })
         
         optionList.forEach(({content, isCorrect}, idx) => {
+          const color_tip = (selectIdx === void 0 || idx !== selectIdx) ? null : //该题目还没做 或 该选项未选中 时没有颜色
+              idx == correctIdx ? correctColor : mistakeColor
           const option = createEl('div', {
             innerText: content,
             className: 'option',
             isCorrect,
             style: {
-              background: (index_item_map.select === void 0 || idx !== index_item_map.select) ? null : //该题目还没做 或 该选项未选中 时没有颜色
-              idx == index_item_map.correctIdx ? correctColor : mistakeColor
+              background: color_tip,
+              borderLeft: `8px solid ${color_tip}`,
             },
             onclick: function(e) {
               const _this = this
               $$('.option').forEach((item, idx) => {
                 if(item == _this) {
-                  index_item_map.select = idx
                   item.style.background = item.isCorrect ? correctColor : mistakeColor
+                  item.style.borderLeft = `8px solid ${item.isCorrect ? correctColor : mistakeColor}`
+
                   index_item_map.style.background = item.isCorrect ? correctColor : mistakeColor
+                  
+                  _ds.record[_ds.selIdx].selectIdx = idx
+                  localStorage.setItem('record', JSON.stringify(_ds.record))
                 } else {
                   item.style.background = null
+                  item.style.borderLeft = '8px solid transparent'
                 }
+                statistic()
 
                 setTimeout(()=> {
-                  generateTesting(sn+1)
-                  // $$('.index-item')[idx+1].scrollIntoView({ behavior: "smooth", block: "end", inline: "nearest" });
+                  const nextSn = _ds.record.findIndex((item, idx) =>  idx > sn-1 && item.selectIdx === void 0)+1
+                  generateTesting(nextSn)
                 }, 400)
               })
             }
@@ -123,61 +229,36 @@
         })
       }
       
+      function statistic() {
+        const statistic = {
+          correct: 0,
+          mistake: 0,
+          answer: 0,
+          question: 0
+        }
+
+        _ds.record.forEach((item, idx) => {
+          if(item.selectIdx !== void 0) {
+            ++statistic.answer
+            ++statistic[item.correctIdx === item.selectIdx ? 'correct' : 'mistake']
+          }
+          ++statistic.question
+        })
+
+        const classNameDic = {
+          correct: 'count-correct',
+          mistake: 'count-mistake',
+          answer: 'count-answer',
+          question: 'count-question',
+        }
+        for(let k in classNameDic) {
+          $('.'+classNameDic[k]).innerText = statistic[k]
+        }
+
+        _ds.statistic = statistic
+      }
     })
 
-
-    function $(selector) {
-      const _this = Element.prototype.isPrototypeOf(this) ? this : document
-      const sel = String(selector).trim();
-
-      const id = /^#([^ +>~\[:]*)$/.exec(sel)?.[1]
-      return (id && _this === document) ? _this.getElementById(id) : _this.querySelector(sel)
-    }
-
-    function $$(selector) {
-      const _this = Element.prototype.isPrototypeOf(this) ? this : document
-      return Array.from(_this.querySelectorAll(selector))
-    }
-
-    function setStyle() {
-      [[Map, () => {
-        const styleMap = arguments[0]
-        for (const [el, styleObj] of styleMap) {
-          !Array.isArray(el) ? setStyleObj(el, styleObj) : el.forEach((el) => setStyleObj(el, styleObj))
-        }
-      }], [Element, () => {
-        const [el, styleObj] = arguments
-        setStyleObj(el, styleObj)
-      }], [Array, () => {
-        const [els, styleObj] = arguments
-        els.forEach((el) => setStyleObj(el, styleObj))
-      }]].some(([O, fn]) => O.prototype.isPrototypeOf(arguments[0]) ? (fn(), true) : false)
-
-      function setStyleObj(el, styleObj) {
-        for (const attr in styleObj) {
-          if (el.style[attr] !== undefined) {
-            el.style[attr] = styleObj[attr]
-          } else {
-            //将key转为标准css属性名
-            const formatAttr = attr.replace(/[A-Z]/, match => `-${match.toLowerCase()}`)
-            console.error(el, `的 ${formatAttr} CSS属性设置失败!`)
-          }
-        }
-      }
-    }
-
-    function createEl(elName, options) {
-      const el = document.createElement(elName)
-      for(let opt in options) {
-        if(opt !== 'style') {
-          el[opt] = options[opt]
-        } else {
-          let styles = options[opt]
-          setStyle(el, styles)
-        }
-      }
-      return el
-    }
   </script>
 </body>
 </html>
