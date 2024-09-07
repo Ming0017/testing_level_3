@@ -5,7 +5,27 @@
 }
 body {
   padding: 10px;
-  background-color: #F0F0F0;
+  width: 100vw;
+  height: 100vh;
+  /* background-color: #F0F0F0; */
+  background-image: url(./mesh-gradient.png);
+  animation: bgAnimation 50s infinite;
+}
+
+@keyframes bgAnimation
+{
+    0%
+    {
+        background-position: 0 0;
+    }
+    50%
+    {
+        background-position: 100% 50%;
+    }
+    100%
+    {
+        background-position: 0 0%;
+    }
 }
 
 header {
