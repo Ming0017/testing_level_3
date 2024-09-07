@@ -2,14 +2,29 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Document</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" user-scalable="no">
+  <title>Level-Four</title>
+  <link rel="stylesheet" href="./assets/index.css">
 </head>
 <body>
-  <div class="index"></div>
-
-  <div class="testing-warp">
-
+  <div class="loading">数据加载中...</div>
+  <header class="header">
+    <div class="statistic-wrap">
+      <div>正确*0</div>
+      <div>错误*0</div>
+      <div>总回答*0</div>
+      <div>总题数*0</div>
+    </div>
+    <div class="operation-wrap">
+      <div>自动下一题</div>
+    </div>
+    <div class=""></div>
+  </header>
+  <div class="index-wrap"></div>
+  <div class="testing-wrap"></div>
+  <div class="switch-wrap">
+    <div class="switch-item last-btn">上一题</div>
+    <div class="switch-item next-btn">下一题</div>
   </div>
   <script>  
     window.$ = Document.prototype.$ = Element.prototype.$ = $
@@ -26,23 +41,87 @@
         })
         return data
       })
+
+      $('.loading').remove()
+
       console.log(testings)
 
-      const testingWarp = $('.testing-warp')
+      const testingWarp = $('.testing-wrap')
+      const indexWrap = $('.index-wrap')
 
-      const {content, optionList} = testings[0]
-      const question = createEl('div', {
-        innerText: content
-      })
-      testingWarp.append(question)
-      
-      optionList.forEach(({content}) => {
-        const option = createEl('div', {
-          innerText: content
+      for(let sn = 1; sn <= testings.length; ++sn) {
+        const index = createEl('div', {
+          className: 'index-item',
+          innerText: sn,
+          correctIdx: testings[sn-1].optionList.findIndex(item => item.isCorrect),
+          onclick: function() {
+            generateTesting(sn)
+          }
         })
+        indexWrap.append(index)
+      }
+
+      function generateTesting(sn) {
+        const indexItems = $$('.index-item')
+        if(sn < 0 || sn > indexItems.length) return alert(1)
+
+        const idx = sn-1
+        const correctColor = 'rgb(39, 174, 96, .5)'
+        const mistakeColor = 'rgb(255, 94, 87, .5)'
+        const {content, optionList} = testings[idx]
+        const index_item_map = indexItems[idx]
+        console.log(index_item_map)
+
+        $('.testing-wrap').innerHTML = ''
+
+        const questionWrap = createEl('div', {
+          className: 'question-wrap',
+        })
+
+        const questionIndex = createEl('span', {
+          innerText: sn+'.',
+          className: 'question-index',
+        })
+
+        const questionInfo = createEl('span', {
+          innerText: content,
+          className: 'question-info',
+        })
+
+        questionWrap.append(questionIndex, questionInfo)
+        testingWarp.append(questionWrap)
         
-        testingWarp.append(option)
-      })
+        optionList.forEach(({content, isCorrect}, idx) => {
+          const option = createEl('div', {
+            innerText: content,
+            className: 'option',
+            isCorrect,
+            style: {
+              background: (index_item_map.select === void 0 || idx !== index_item_map.select) ? null : //该题目还没做 或 该选项未选中 时没有颜色
+              idx == index_item_map.correctIdx ? correctColor : mistakeColor
+            },
+            onclick: function(e) {
+              const _this = this
+              $$('.option').forEach((item, idx) => {
+                if(item == _this) {
+                  index_item_map.select = idx
+                  item.style.background = item.isCorrect ? correctColor : mistakeColor
+                  index_item_map.style.background = item.isCorrect ? correctColor : mistakeColor
+                } else {
+                  item.style.background = null
+                }
+
+                setTimeout(()=> {
+                  generateTesting(sn+1)
+                  // $$('.index-item')[idx+1].scrollIntoView({ behavior: "smooth", block: "end", inline: "nearest" });
+                }, 400)
+              })
+            }
+          })
+          
+          testingWarp.append(option)
+        })
+      }
       
     })
 
