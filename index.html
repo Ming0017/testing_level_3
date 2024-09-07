@@ -20,7 +20,7 @@
         <span class="count-mistake">0</span>
       </div>
       <div class="statistic-answer">
-        <span>总回答*</span>
+        <span>总答题*</span>
         <span class="count-answer">0</span>
       </div>
       <div class="statistic-question">
@@ -217,10 +217,12 @@
                 }
                 statistic()
 
-                setTimeout(()=> {
-                  const nextSn = _ds.record.findIndex((item, idx) =>  idx > sn-1 && item.selectIdx === void 0)+1
-                  generateTesting(nextSn)
-                }, 400)
+                if(_this.isCorrect) {
+                  setTimeout(()=> {
+                    const nextSn = _ds.record.findIndex((item, idx) =>  idx > sn-1 && item.selectIdx === void 0)+1
+                    generateTesting(nextSn)
+                  }, 400)
+                }
               })
             }
           })
