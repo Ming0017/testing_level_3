@@ -10,7 +10,7 @@
 <body>
   <div class="loading">数据加载中...</div>
   <header class="header" style="display: none;">
-    <div class="statistic-wrap">
+    <div class="statistic-wrap" >
       <div class="statistic-correct">
         <span>正确*</span>
         <span class="count-correct">0</span>
@@ -28,135 +28,256 @@
         <span class="count-question">0</span>
       </div>
     </div>
-    <div class="operation-wrap">
-      <!-- <div>自动下一题</div> -->
-    </div>
-    <div class=""></div>
   </header>
-  <div class="index-wrap" style="display: none;"></div>
-  <div class="testing-wrap" style="display: none;"></div>
-  <div class="switch-wrap" style="display: none;">
+  <div class="tag-wrap" style="display: none">
+  </div>
+  <div class="index-wrap" style="display: none"></div>
+  <div class="testing-wrap" style="display: none"></div>
+  <div class="switch-wrap" style="display: none">
     <div class="switch-item last-btn">上一题</div>
     <div class="switch-item next-btn">下一题</div>
   </div>
+  <div class="operation">
+    <div class="reset">重置</div>
+  </div>
+
   <script>  
     _ds = {
-      selIdx: 0,
-      record: [],
+      questionBanks: {},
       statistic: {
         correct: 0,
         mistake: 0,
         answer: 0,
         question: 0
       },
-      correctColor: 'rgb(39, 174, 96, .5)',
-      mistakeColor: 'rgb(255, 94, 87, .5)',
+      correctColor_index: 'rgb(39, 174, 96, .5)',
+      mistakeColor_index: 'rgb(255, 94, 87, .5)',
+      correctColor_option: 'rgb(39, 174, 96, .3)',
+      mistakeColor_option: 'rgb(255, 94, 87, .3)',
     }
 
-    fetch('./testing-data/level-five.json')
-    .then(res => res.json())
-    .then(async (res) => {
-      const level_five_data = res
-      const level_four_data = await fetch('./testing-data/level-four.json').then(res => res.json())
-      const testings = [...level_four_data, ...level_five_data].map(({data}) => {
-        data.optionList.some((option) => {
-          option.isCorrect = option.id == data.answer.optionIdSet
-        })
-        return data
-      })
+    let _testing = []
+    Object.defineProperty(_ds, 'testing', {
+      get() {
+        return _testing
+      },
+      set(newVal) {
+        _testing = newVal
 
+        generateIndexItems(newVal)
+        const indexItems = $$('.index-item')
+        const nextQuestion = indexItems.find(item => item.selectIdx === void 0)
+        if(nextQuestion) {
+          nextQuestion.click()
+        } else {
+          indexItems.at(-1)?.click()
+        }
+        $('.index-wrap').scrollTo({top:0, behavior: 'smooth'})
+        
+        statistic()
+      }
+    })
+    let _selIdx = 0
+    Object.defineProperty(_ds, 'selIdx', {
+      get() {
+        return _selIdx
+      },
+      set(newVal) {
+        if(newVal < 0 || newVal > _ds.testing.length-1) return
+        _selIdx = newVal
+
+        generateQuestion(_selIdx+1)
+      }
+    })
+    let _selTag = localStorage.getItem('selTag') ?? ''
+    Object.defineProperty(_ds, 'selTag', {
+      get() {
+        return _selTag
+      },
+      set(newVal) {
+          if(newVal !== '标记') {
+            _ds.testing = _ds.questionBanks[newVal]
+            _selTag = newVal
+            localStorage.setItem('selTag', newVal)
+            updateStyle()
+          } else {
+            const collection = []
+            for(let k in _ds.questionBanks) {
+              _ds.questionBanks[k].forEach(item => {
+                if(item.isCollect) collection.push(item)
+              })
+            }
+            if(!collection.length) {
+              alert('暂无被标记的题目，可尝试点击题目序号将其转为被标记状态。')
+              if(_ds.selTag == '标记') _ds.selTag = '四级'
+              return
+            }
+            _ds.testing = collection
+            _selTag = newVal
+            localStorage.setItem('selTag', newVal)
+            updateStyle()
+          }
+
+          function updateStyle() {
+            $$('.tag').forEach(tag => {
+              const isCurrent = tag.bankName == newVal
+              setStyle(tag, {
+                height: isCurrent ? '25px' : '20px',
+                color: isCurrent ? '#444' : '#888',
+                lineHeight: isCurrent ? '25px' : '20px',
+                fontSize: isCurrent ? '13.5px' : '13px',
+              })
+            })
+          }
+      }
+    })
+
+
+    dataLoad().then(res => {
       $('.loading').remove()
-      setStyle(['header', '.index-wrap', '.testing-wrap','.switch-wrap'].map(sel => $(sel)), {
+
+      setStyle(['header', '.tag-wrap', '.index-wrap', '.testing-wrap','.switch-wrap'].map(sel => $(sel)), {
         display: null
       })
 
-      console.log(testings)
-
-      const record = testings.map((item) => {
-        return {
-          id: item.id,
-          correctIdx: item.optionList.findIndex(item => item.isCorrect),
-        }
+      tagList = ['四级', '五级', '标记']
+      tagList.forEach(tagName => {
+        const tag = createEl('div', {
+          className: 'tag',
+          bankName: tagName,
+          innerText: tagName,
+          onclick: function() {
+            _ds.selTag = this.bankName
+          }
+        })
+        $('.tag-wrap').append(tag)
       })
 
-      //尝试使用缓存并校验
-      try {
-        const record_local = JSON.parse(localStorage.getItem('record'))
-        if(Array.isArray(record_local) && record.length == record_local.length) {
-          const isSame = record.every((item, idx) => {
-            for(let k in item) {
-              const compareKeys = ['id', 'correctIdx']
-              for(let i = 0; i < compareKeys.length; i++) {
-                if(compareKeys.includes(k) && record[idx][k] !== record_local[idx][k]) {
-                  return false
-                }
-              }
-            }
-            return true
-          })
-          if(isSame) {
-            _ds.record = confirm('是否使用历史记录') ? record_local : record
-          } else {
-            throw('本地数据异常')
-          }
-        } else if(record_local === null) {
-          _ds.record = record
-          localStorage.setItem('record', JSON.stringify(_ds.record))
-        } else {
-          _ds.record = record
-          throw('本地数据异常')
-        }
-      } catch(e) {
-        _ds.record = record
-        localStorage.setItem('record', JSON.stringify(_ds.record))
+      _ds.selTag = localStorage.getItem('selTag') ?? '四级'
 
-        alert('本地数据异常，现已对数据进行重置')
+      $('.last-btn').onclick = function() {
+        _ds.selIdx--
       }
 
-      statistic()
+      $('.next-btn').onclick = function() {
+        _ds.selIdx++
+      }
 
-      const testingWarp = $('.testing-wrap')
-      const indexWrap = $('.index-wrap')
+      $('.reset').onclick = function() {
+        if(!confirm(`是否重置当前【${_ds.selTag}】中的作业记录？`)) return
+        _ds.testing.forEach(item => item.selectIdx = void 0)
+        _ds.selTag = _ds.selTag
+        localStorage.setItem('local_record', JSON.stringify(_ds.questionBanks))
+      }
 
-      for(let sn = 1; sn <= testings.length; ++sn) {
-        const correctIdx = testings[sn-1].optionList.findIndex(item => item.isCorrect)
-        const selectIdx = _ds.record[sn-1].selectIdx
+    })
+
+    function generateIndexItems(questionBank) {
+      $('.index-wrap').innerHTML = ''
+
+      for(let sn = 1; sn <= questionBank.length; ++sn) {
+        const curQuestion = questionBank[sn-1]
+        const correctIdx = curQuestion.correctIdx
+        const selectIdx = curQuestion.selectIdx
 
         const index = createEl('div', {
           className: 'index-item',
           innerText: sn,
-          questionId: testings[sn-1].id,
+          questionId: questionBank[sn-1].id,
+          selectIdx,
           correctIdx: correctIdx,
           onclick: function() {
-            generateTesting(sn)
+            _ds.selIdx = sn-1
+            this.selectIdx = questionBank[sn-1].selectIdx
           },
           style: {
             background: selectIdx === void 0 ? null : 
-            _ds.record[sn-1].selectIdx === correctIdx ? _ds.correctColor : _ds.mistakeColor
+            curQuestion.selectIdx === correctIdx ? _ds.correctColor_index : _ds.mistakeColor_index
           }
         })
-        indexWrap.append(index)
+        $('.index-wrap').append(index)
       }
+    }
 
-      $('.last-btn').onclick = function() {
-        generateTesting(_ds.selIdx)
-      }
+    function dataLoad() {
+      const fetchMap = [['四级', './testing-data/level-four.json'], ['五级', './testing-data/level-five.json']]
+      
+      return Promise.all(fetchMap.map(([name, url]) => fetch(url).then(res => res.json())))
+      .then(allRes => {
+        const questionBanks = {}
+        allRes.map((res, idx) => {
+          let bank = questionBanks[fetchMap[idx][0]] = []
 
-      $('.next-btn').onclick = function() {
-        generateTesting(_ds.selIdx+2)
-      }
+          res.map(({data}) => {
+            data.isCollect = false
 
-      $$('.index-item')[0].click()
+            data.optionList.some((option, idx) => {
+              const isCorrect = option.id == data.answer.optionIdSet
+              if(isCorrect) data.correctIdx = idx
+              option.isCorrect = isCorrect
+            })
+            bank.push(data)
+          })
+        })
 
-      function generateTesting(sn) {
-        if(sn < 0 || sn > _ds.record.length) return
+        const local_record = JSON.parse(localStorage.getItem('local_record'))
+        if(local_record) {
+          _ds.questionBanks = local_record
+        } else {
+          _ds.questionBanks = questionBanks
+        }
+
+      })
+      
+
+
+      // //尝试使用缓存并校验
+      // try {
+      //   const record_local = JSON.parse(localStorage.getItem('record'))
+      //   if(Array.isArray(record_local) && record.length == record_local.length) {
+      //     const isSame = record.every((item, idx) => {
+      //       for(let k in item) {
+      //         const compareKeys = ['id', 'correctIdx']
+      //         for(let i = 0; i < compareKeys.length; i++) {
+      //           if(compareKeys.includes(k) && record[idx][k] !== record_local[idx][k]) {
+      //             return false
+      //           }
+      //         }
+      //       }
+      //       return true
+      //     })
+      //     if(isSame) {
+      //       _ds.record = confirm('是否使用历史记录') ? record_local : record
+      //     } else {
+      //       throw('本地数据异常')
+      //     }
+      //   } else if(record_local === null) {
+      //     _ds.record = record
+      //     localStorage.setItem('record', JSON.stringify(_ds.record))
+      //   } else {
+      //     _ds.record = record
+      //     throw('本地数据异常')
+      //   }
+      // } catch(e) {
+      //   _ds.record = record
+      //   localStorage.setItem('record', JSON.stringify(_ds.record))
+
+      //   alert('本地数据异常，现已对数据进行重置')
+      // }
+
+      // statistic()
+
+    }
+
+    function generateQuestion(sn) {
+        if(sn <= 0 || sn > _ds.testing.length) return
+
+        const testingWrap = $('.testing-wrap')
 
         const idx = sn-1
-        _ds.selIdx = idx
-        const { correctIdx, selectIdx} = _ds.record[idx]
-        const correctColor = _ds.correctColor
-        const mistakeColor = _ds.mistakeColor
-        const {content, optionList} = testings[idx]
+        const curQuestion = _ds.testing[idx]
+        const { correctIdx, selectIdx, content, optionList} = curQuestion
+        const {correctColor_option: correctColor, mistakeColor_option: mistakeColor} = _ds
         const indexItems = $$('.index-item')
         const index_item_map = indexItems[idx]
         index_item_map.scrollIntoView({ behavior: "smooth", block: "center" });
@@ -170,6 +291,15 @@
         const questionIndex = createEl('span', {
           innerText: sn+'.',
           className: 'question-index',
+          onclick: function() {
+            const isCollect = curQuestion.isCollect
+            this.style.backgroundPosition = isCollect ? '0px' : '40px'
+            curQuestion.isCollect = !isCollect
+            localStorage.setItem('local_record', JSON.stringify(_ds.questionBanks))
+          },
+          style: {
+            backgroundPosition: curQuestion.isCollect ? '40px' : '0px'
+          }
         })
 
         const questionInfo = createEl('span', {
@@ -178,15 +308,17 @@
         })
 
         questionWrap.append(questionIndex, questionInfo)
-        testingWarp.append(questionWrap)
+        testingWrap.append(questionWrap)
 
         indexItems.forEach((item, idx) => {
-          const isCurrent = idx == _ds.selIdx
-          item.style.boxShadow = isCurrent ? '0px 0px 8px rgba(0, 0, 0, .12)' : null
-          item.style.textShadow = isCurrent ? '0px 0px 8px rgb(255, 255, 255)' : null
-          item.style.width = isCurrent ? '43px' : '40px'
-          item.style.height = isCurrent ? '37px' : '35px'
-          item.style.lineHeight = isCurrent ? '37px' : '35px'
+          const isCurrent = idx == sn-1
+          setStyle(item, {
+            boxShadow: isCurrent ? '0px 0px 8px rgba(0, 0, 0, .12)' : null,
+            textShadow: isCurrent ? '0px 0px 8px rgb(255, 255, 255)' : null,
+            width: isCurrent ? '43px' : '40px',
+            height: isCurrent ? '37px' : '35px',
+            lineHeight: isCurrent ? '37px' : '35px',
+          })
         })
         
         optionList.forEach(({content, isCorrect}, idx) => {
@@ -207,59 +339,59 @@
                   item.style.background = item.isCorrect ? correctColor : mistakeColor
                   item.style.borderLeft = `8px solid ${item.isCorrect ? correctColor : mistakeColor}`
 
-                  index_item_map.style.background = item.isCorrect ? correctColor : mistakeColor
+                  index_item_map.style.background = item.isCorrect ? _ds.correctColor_index : _ds.mistakeColor_index
                   
-                  _ds.record[_ds.selIdx].selectIdx = idx
-                  localStorage.setItem('record', JSON.stringify(_ds.record))
+                  _ds.testing[sn-1].selectIdx = idx
+
+                  if(_this.isCorrect) {
+                    setTimeout(()=> {
+                      _ds.selIdx = _ds.testing.findIndex((item, idx) =>  idx > sn-1 && item.selectIdx === void 0)
+                    }, 400)
+                  }
                 } else {
                   item.style.background = null
                   item.style.borderLeft = '8px solid transparent'
                 }
-                statistic()
 
-                if(_this.isCorrect) {
-                  setTimeout(()=> {
-                    const nextSn = _ds.record.findIndex((item, idx) =>  idx > sn-1 && item.selectIdx === void 0)+1
-                    generateTesting(nextSn)
-                  }, 400)
-                }
+                localStorage.setItem('local_record', JSON.stringify(_ds.questionBanks))
+
+                statistic()
               })
             }
           })
           
-          testingWarp.append(option)
+          testingWrap.append(option)
         })
       }
-      
-      function statistic() {
-        const statistic = {
-          correct: 0,
-          mistake: 0,
-          answer: 0,
-          question: 0
-        }
-
-        _ds.record.forEach((item, idx) => {
-          if(item.selectIdx !== void 0) {
-            ++statistic.answer
-            ++statistic[item.correctIdx === item.selectIdx ? 'correct' : 'mistake']
-          }
-          ++statistic.question
-        })
-
-        const classNameDic = {
-          correct: 'count-correct',
-          mistake: 'count-mistake',
-          answer: 'count-answer',
-          question: 'count-question',
-        }
-        for(let k in classNameDic) {
-          $('.'+classNameDic[k]).innerText = statistic[k]
-        }
-
-        _ds.statistic = statistic
+    
+    function statistic() {
+      const statistic = {
+        correct: 0,
+        mistake: 0,
+        answer: 0,
+        question: 0
       }
-    })
+
+      _ds.testing.forEach((item, idx) => {
+        if(item.selectIdx !== void 0) {
+          ++statistic.answer
+          ++statistic[item.correctIdx === item.selectIdx ? 'correct' : 'mistake']
+        }
+        ++statistic.question
+      })
+
+      const classNameDic = {
+        correct: 'count-correct',
+        mistake: 'count-mistake',
+        answer: 'count-answer',
+        question: 'count-question',
+      }
+      for(let k in classNameDic) {
+        $('.'+classNameDic[k]).innerText = statistic[k]
+      }
+
+      _ds.statistic = statistic
+    }
 
   </script>
 </body>
