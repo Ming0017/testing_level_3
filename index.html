@@ -38,11 +38,14 @@
     <div class="switch-item next-btn">下一题</div>
   </div>
   <div class="operation">
-    <div class="reset">重置</div>
+    <div class="mode"></div>
+    <div class="reset">重置记录</div>
   </div>
 
   <script>  
     _ds = {
+      version: '2024.9.18.1',
+      mode: void 0,
       questionBanks: {},
       statistic: {
         correct: 0,
@@ -170,6 +173,21 @@
         localStorage.setItem('local_record', JSON.stringify(_ds.questionBanks))
       }
 
+
+      const mode = localStorage.getItem('mode')
+      if(mode) {
+        $('.mode').innerText = mode === '1' ? '顺序切题' : '随机切题'
+      } else {
+        _ds.mode = 1
+        $('.mode').innerText = '顺序切题' 
+        localStorage.setItem('mode', _ds.mode)
+      }
+      $('.mode').onclick = function() {
+        this.innerText = _ds.mode === 1 ? '随机切题' : '顺序切题'
+        _ds.mode = _ds.mode === 1 ? 2 : 1
+        localStorage.setItem('mode', _ds.mode)
+      }
+
     })
 
     function generateIndexItems(questionBank) {
@@ -220,12 +238,16 @@
           })
         })
 
-        const local_record = JSON.parse(localStorage.getItem('local_record'))
-        if(local_record) {
-          _ds.questionBanks = local_record
+        const version = localStorage.getItem('version')
+        if(version === _ds.version) {
+          const local_record = JSON.parse(localStorage.getItem('local_record'))
+          if(local_record) _ds.questionBanks = local_record
         } else {
           _ds.questionBanks = questionBanks
+          localStorage.setItem('local_record', JSON.stringify(_ds.questionBanks))
+          localStorage.setItem('version', _ds.version)
         }
+
 
       })
       
