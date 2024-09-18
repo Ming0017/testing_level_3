@@ -40,6 +40,7 @@ header {
   background: #fff;
   border-radius: 6px;
   box-shadow: 0px 0px 5px rgba(0, 0, 0, .12);
+  color: #111;
 }
 
 header .statistic-wrap {
@@ -101,7 +102,6 @@ header .operation-wrap {
   text-align: center;
   color: #fff;
   transition: .3s all;
-  cursor: pointer;
 }
 
 .testing-wrap {
@@ -136,6 +136,7 @@ header .operation-wrap {
   font-size: 18px;
   margin-top: 5px;
   margin-left: 5px;
+  color: #222;
 }
 
 .option {
@@ -181,11 +182,11 @@ header .operation-wrap {
 .reset,.mode {
   margin-left: 10px;
   padding: 5px 8px;
-  line-height: 14px;
+  line-height: 12px;
   text-align: center;
   background-color: lightgray;
   border-radius: 5px;
-  font-size: 14px;
+  font-size: 12px;
   color: #555;
   box-shadow: 2px 0px 5px rgba(0, 0, 0, .1);
 }

@@ -156,9 +156,9 @@
       }
     })
 
-    const mode = localStorage.getItem('mode')
+    let mode = localStorage.getItem('mode')
     if(mode) {
-      _ds.mode = parseInt(mode)
+      _ds.mode = mode = parseInt(mode)
       $('.mode').innerText = mode == 1 ? '顺序切题' : '随机切题'
     } else {
       _ds.mode = 1
@@ -167,6 +167,7 @@
     }
     $('.mode').onclick = function() {
       this.innerText = _ds.mode == 1 ? '随机切题' : '顺序切题'
+      if(_ds.mode == 2) _ds.lastQuestionIdx = void 0
       _ds.mode = _ds.mode == 1 ? 2 : 1
       localStorage.setItem('mode', _ds.mode)
     }
@@ -275,45 +276,6 @@
 
 
       })
-      
-
-
-      // //尝试使用缓存并校验
-      // try {
-      //   const record_local = JSON.parse(localStorage.getItem('record'))
-      //   if(Array.isArray(record_local) && record.length == record_local.length) {
-      //     const isSame = record.every((item, idx) => {
-      //       for(let k in item) {
-      //         const compareKeys = ['id', 'correctIdx']
-      //         for(let i = 0; i < compareKeys.length; i++) {
-      //           if(compareKeys.includes(k) && record[idx][k] !== record_local[idx][k]) {
-      //             return false
-      //           }
-      //         }
-      //       }
-      //       return true
-      //     })
-      //     if(isSame) {
-      //       _ds.record = confirm('是否使用历史记录') ? record_local : record
-      //     } else {
-      //       throw('本地数据异常')
-      //     }
-      //   } else if(record_local === null) {
-      //     _ds.record = record
-      //     localStorage.setItem('record', JSON.stringify(_ds.record))
-      //   } else {
-      //     _ds.record = record
-      //     throw('本地数据异常')
-      //   }
-      // } catch(e) {
-      //   _ds.record = record
-      //   localStorage.setItem('record', JSON.stringify(_ds.record))
-
-      //   alert('本地数据异常，现已对数据进行重置')
-      // }
-
-      // statistic()
-
     }
 
     function generateQuestion(sn) {
@@ -415,7 +377,7 @@
       if (_ds.mode == 1) {
         const next_idx = _ds.testing.findIndex((item, idx) => idx > sn - 1 && item.selectIdx === void 0)
         _ds.selIdx = next_idx
-        _ds.lastQuestionIdx = random_idx
+        _ds.lastQuestionIdx = void 0
 
       } else {
         let idx_range = []
