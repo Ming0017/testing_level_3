@@ -53,6 +53,7 @@
         answer: 0,
         question: 0
       },
+      lastQuestionIdx: void 0,
       correctColor_index: 'rgb(39, 174, 96, .5)',
       mistakeColor_index: 'rgb(255, 94, 87, .5)',
       correctColor_option: 'rgb(39, 174, 96, .3)',
@@ -68,14 +69,32 @@
         _testing = newVal
 
         generateIndexItems(newVal)
-        const indexItems = $$('.index-item')
-        const nextQuestion = indexItems.find(item => item.selectIdx === void 0)
-        if(nextQuestion) {
-          nextQuestion.click()
-        } else {
-          indexItems.at(-1)?.click()
-        }
-        $('.index-wrap').scrollTo({top:0, behavior: 'smooth'})
+        
+        setTimeout(() => {
+          const indexItems = $$('.index-item')
+          if(_ds.mode == 1) {
+            const nextQuestion = indexItems.find(item => item.selectIdx === void 0)
+            if(nextQuestion) {
+              nextQuestion.click()
+            } else {
+              indexItems.at(-1)?.click()
+            }
+          } else {
+            let idx_range = []
+            _ds.testing.forEach((item, idx) => {
+              if (item.selectIdx == void 0) idx_range.push(idx)
+            })
+            if (idx_range.length) {
+              const random_idx = idx_range[randomNum(0, idx_range.length - 1)]
+              _ds.selIdx = random_idx
+            } else {
+              _ds.selIdx = indexItems.length-1
+            }
+          }
+
+          $$('.index-item')[_ds.selIdx].scrollIntoView({ behavior: "smooth", block: "center" })
+        })
+        
         
         statistic()
       }
@@ -103,6 +122,7 @@
             _selTag = newVal
             localStorage.setItem('selTag', newVal)
             updateStyle()
+            _ds.lastQuestionIdx = void 0
           } else {
             const collection = []
             for(let k in _ds.questionBanks) {
@@ -119,6 +139,7 @@
             _selTag = newVal
             localStorage.setItem('selTag', newVal)
             updateStyle()
+            _ds.lastQuestionIdx = void 0
           }
 
           function updateStyle() {
@@ -135,6 +156,20 @@
       }
     })
 
+    const mode = localStorage.getItem('mode')
+    if(mode) {
+      _ds.mode = parseInt(mode)
+      $('.mode').innerText = mode == 1 ? '顺序切题' : '随机切题'
+    } else {
+      _ds.mode = 1
+      $('.mode').innerText = '顺序切题' 
+      localStorage.setItem('mode', _ds.mode)
+    }
+    $('.mode').onclick = function() {
+      this.innerText = _ds.mode == 1 ? '随机切题' : '顺序切题'
+      _ds.mode = _ds.mode == 1 ? 2 : 1
+      localStorage.setItem('mode', _ds.mode)
+    }
 
     dataLoad().then(res => {
       $('.loading').remove()
@@ -159,7 +194,12 @@
       _ds.selTag = localStorage.getItem('selTag') ?? '四级'
 
       $('.last-btn').onclick = function() {
-        _ds.selIdx--
+        if(_ds.lastQuestionIdx !== void 0) {
+          _ds.selIdx = _ds.lastQuestionIdx
+          _ds.lastQuestionIdx = void 0
+        } else {
+          _ds.selIdx--
+        }
       }
 
       $('.next-btn').onclick = function() {
@@ -171,21 +211,6 @@
         _ds.testing.forEach(item => item.selectIdx = void 0)
         _ds.selTag = _ds.selTag
         localStorage.setItem('local_record', JSON.stringify(_ds.questionBanks))
-      }
-
-
-      const mode = localStorage.getItem('mode')
-      if(mode) {
-        $('.mode').innerText = mode === '1' ? '顺序切题' : '随机切题'
-      } else {
-        _ds.mode = 1
-        $('.mode').innerText = '顺序切题' 
-        localStorage.setItem('mode', _ds.mode)
-      }
-      $('.mode').onclick = function() {
-        this.innerText = _ds.mode === 1 ? '随机切题' : '顺序切题'
-        _ds.mode = _ds.mode === 1 ? 2 : 1
-        localStorage.setItem('mode', _ds.mode)
       }
 
     })
@@ -292,100 +317,134 @@
     }
 
     function generateQuestion(sn) {
-        if(sn <= 0 || sn > _ds.testing.length) return
+      if(sn <= 0 || sn > _ds.testing.length) return
 
-        const testingWrap = $('.testing-wrap')
+      const testingWrap = $('.testing-wrap')
 
-        const idx = sn-1
-        const curQuestion = _ds.testing[idx]
-        const { correctIdx, selectIdx, content, optionList} = curQuestion
-        const {correctColor_option: correctColor, mistakeColor_option: mistakeColor} = _ds
-        const indexItems = $$('.index-item')
-        const index_item_map = indexItems[idx]
-        index_item_map.scrollIntoView({ behavior: "smooth", block: "center" });
+      const idx = sn-1
+      const curQuestion = _ds.testing[idx]
+      const { correctIdx, selectIdx, content, optionList} = curQuestion
+      const {correctColor_option: correctColor, mistakeColor_option: mistakeColor} = _ds
+      const indexItems = $$('.index-item')
+      const index_item_map = indexItems[idx]
+      index_item_map.scrollIntoView({ behavior: "smooth", block: "center" });
 
-        $('.testing-wrap').innerHTML = ''
+      $('.testing-wrap').innerHTML = ''
 
-        const questionWrap = createEl('div', {
-          className: 'question-wrap',
+      const questionWrap = createEl('div', {
+        className: 'question-wrap',
+      })
+
+      const questionIndex = createEl('span', {
+        innerText: sn+'.',
+        className: 'question-index',
+        onclick: function() {
+          const isCollect = curQuestion.isCollect
+          this.style.backgroundPosition = isCollect ? '0px' : '40px'
+          curQuestion.isCollect = !isCollect
+          localStorage.setItem('local_record', JSON.stringify(_ds.questionBanks))
+        },
+        style: {
+          backgroundPosition: curQuestion.isCollect ? '40px' : '0px'
+        }
+      })
+
+      const questionInfo = createEl('span', {
+        innerText: content,
+        className: 'question-info',
+      })
+
+      questionWrap.append(questionIndex, questionInfo)
+      testingWrap.append(questionWrap)
+
+      indexItems.forEach((item, idx) => {
+        const isCurrent = idx == sn-1
+        setStyle(item, {
+          boxShadow: isCurrent ? '0px 0px 8px rgba(0, 0, 0, .12)' : null,
+          textShadow: isCurrent ? '0px 0px 8px rgb(255, 255, 255)' : null,
+          width: isCurrent ? '43px' : '40px',
+          height: isCurrent ? '37px' : '35px',
+          lineHeight: isCurrent ? '37px' : '35px',
         })
-
-        const questionIndex = createEl('span', {
-          innerText: sn+'.',
-          className: 'question-index',
-          onclick: function() {
-            const isCollect = curQuestion.isCollect
-            this.style.backgroundPosition = isCollect ? '0px' : '40px'
-            curQuestion.isCollect = !isCollect
-            localStorage.setItem('local_record', JSON.stringify(_ds.questionBanks))
-          },
+      })
+      
+      optionList.forEach(({content, isCorrect}, idx) => {
+        const color_tip = (selectIdx === void 0 || idx !== selectIdx) ? null : //该题目还没做 或 该选项未选中 时没有颜色
+            idx == correctIdx ? correctColor : mistakeColor
+        const option = createEl('div', {
+          innerText: content,
+          className: 'option',
+          isCorrect,
           style: {
-            backgroundPosition: curQuestion.isCollect ? '40px' : '0px'
+            background: color_tip,
+            borderLeft: `8px solid ${color_tip}`,
+          },
+          onclick: function(e) {
+            const _this = this
+            $$('.option').forEach((item, idx) => {
+              if(item == _this) {
+                item.style.background = item.isCorrect ? correctColor : mistakeColor
+                item.style.borderLeft = `8px solid ${item.isCorrect ? correctColor : mistakeColor}`
+
+                index_item_map.style.background = item.isCorrect ? _ds.correctColor_index : _ds.mistakeColor_index
+                
+                _ds.testing[sn-1].selectIdx = idx
+
+                if(_this.isCorrect) {
+                  setTimeout(()=> {
+                    switchNextQuestion(sn)
+                  }, 400)
+                }
+              } else {
+                item.style.background = null
+                item.style.borderLeft = '8px solid transparent'
+              }
+
+              localStorage.setItem('local_record', JSON.stringify(_ds.questionBanks))
+
+              statistic()
+            })
           }
         })
-
-        const questionInfo = createEl('span', {
-          innerText: content,
-          className: 'question-info',
-        })
-
-        questionWrap.append(questionIndex, questionInfo)
-        testingWrap.append(questionWrap)
-
-        indexItems.forEach((item, idx) => {
-          const isCurrent = idx == sn-1
-          setStyle(item, {
-            boxShadow: isCurrent ? '0px 0px 8px rgba(0, 0, 0, .12)' : null,
-            textShadow: isCurrent ? '0px 0px 8px rgb(255, 255, 255)' : null,
-            width: isCurrent ? '43px' : '40px',
-            height: isCurrent ? '37px' : '35px',
-            lineHeight: isCurrent ? '37px' : '35px',
-          })
-        })
         
-        optionList.forEach(({content, isCorrect}, idx) => {
-          const color_tip = (selectIdx === void 0 || idx !== selectIdx) ? null : //该题目还没做 或 该选项未选中 时没有颜色
-              idx == correctIdx ? correctColor : mistakeColor
-          const option = createEl('div', {
-            innerText: content,
-            className: 'option',
-            isCorrect,
-            style: {
-              background: color_tip,
-              borderLeft: `8px solid ${color_tip}`,
-            },
-            onclick: function(e) {
-              const _this = this
-              $$('.option').forEach((item, idx) => {
-                if(item == _this) {
-                  item.style.background = item.isCorrect ? correctColor : mistakeColor
-                  item.style.borderLeft = `8px solid ${item.isCorrect ? correctColor : mistakeColor}`
-
-                  index_item_map.style.background = item.isCorrect ? _ds.correctColor_index : _ds.mistakeColor_index
-                  
-                  _ds.testing[sn-1].selectIdx = idx
-
-                  if(_this.isCorrect) {
-                    setTimeout(()=> {
-                      _ds.selIdx = _ds.testing.findIndex((item, idx) =>  idx > sn-1 && item.selectIdx === void 0)
-                    }, 400)
-                  }
-                } else {
-                  item.style.background = null
-                  item.style.borderLeft = '8px solid transparent'
-                }
-
-                localStorage.setItem('local_record', JSON.stringify(_ds.questionBanks))
-
-                statistic()
-              })
-            }
-          })
-          
-          testingWrap.append(option)
-        })
-      }
+        testingWrap.append(option)
+      })
+    }
     
+    function switchNextQuestion(sn) {
+      if (_ds.mode == 1) {
+        const next_idx = _ds.testing.findIndex((item, idx) => idx > sn - 1 && item.selectIdx === void 0)
+        _ds.selIdx = next_idx
+        _ds.lastQuestionIdx = random_idx
+
+      } else {
+        let idx_range = []
+        _ds.testing.forEach((item, idx) => {
+          if (item.selectIdx == void 0) idx_range.push(idx)
+        })
+        if (idx_range.length) {
+          const random_idx = idx_range[randomNum(0, idx_range.length - 1)]
+          _ds.lastQuestionIdx = _ds.selIdx
+          _ds.selIdx = random_idx
+        }
+      }
+    }
+
+    //取得[n,m]范围随机数
+    function randomNum(minNum, maxNum) {
+      switch (arguments.length) {
+        case 1:
+          return parseInt(Math.random() * minNum + 1, 10);
+          break;
+        case 2:
+          return parseInt(Math.random() * (maxNum - minNum + 1) + minNum, 10);
+          break;
+        default:
+          return 0;
+          break;
+      }
+    }
+
     function statistic() {
       const statistic = {
         correct: 0,
