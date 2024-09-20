@@ -39,12 +39,12 @@
   </div>
   <div class="operation">
     <div class="mode"></div>
-    <div class="reset">重置记录</div>
+    <div class="reset">重置答题</div>
   </div>
 
   <script>  
     _ds = {
-      version: '2024.9.18.1',
+      version: '2024.9.20.1',
       mode: void 0,
       questionBanks: {},
       statistic: {
@@ -82,7 +82,7 @@
           } else {
             let idx_range = []
             _ds.testing.forEach((item, idx) => {
-              if (item.selectIdx == void 0) idx_range.push(idx)
+              if (item.selectIdx.length == 0) idx_range.push(idx)
             })
             if (idx_range.length) {
               const random_idx = idx_range[randomNum(0, idx_range.length - 1)]
@@ -208,8 +208,8 @@
       }
 
       $('.reset').onclick = function() {
-        if(!confirm(`是否重置当前【${_ds.selTag}】中的作业记录？`)) return
-        _ds.testing.forEach(item => item.selectIdx = void 0)
+        if(!confirm(`是否重置当前【${_ds.selTag}】中的答题记录？`)) return
+        _ds.testing.forEach(item => item.selectIdx = [])
         _ds.selTag = _ds.selTag
         localStorage.setItem('local_record', JSON.stringify(_ds.questionBanks))
       }
@@ -265,15 +265,15 @@
         })
 
         _ds.questionBanks = questionBanks
-        // const version = localStorage.getItem('version')
-        // if(version === _ds.version) {
-        //   const local_record = JSON.parse(localStorage.getItem('local_record'))
-        //   if(local_record) _ds.questionBanks = local_record
-        // } else {
-        //   _ds.questionBanks = questionBanks
-        //   localStorage.setItem('local_record', JSON.stringify(_ds.questionBanks))
-        //   localStorage.setItem('version', _ds.version)
-        // }
+        const version = localStorage.getItem('version')
+        if(version === _ds.version) {
+          const local_record = JSON.parse(localStorage.getItem('local_record'))
+          if(local_record) _ds.questionBanks = local_record
+        } else {
+          _ds.questionBanks = questionBanks
+          localStorage.setItem('local_record', JSON.stringify(_ds.questionBanks))
+          localStorage.setItem('version', _ds.version)
+        }
       })
     }
 
@@ -289,6 +289,7 @@
       const indexItems = $$('.index-item')
       const index_item_map = indexItems[idx]
       index_item_map.scrollIntoView({ behavior: "smooth", block: "center" });
+      const isMutiSel = curQuestion.correctIdx.length > 1
 
       $('.testing-wrap').innerHTML = ''
 
@@ -340,21 +341,21 @@
       
       optionList.forEach((option, idx) => {
         let {content, isCorrect} = option
-        // const color_tip = (selectIdx === void 0 || idx !== selectIdx) ? null : //该题目还没做 或 该选项未选中 时没有颜色
-        //     idx == correctIdx ? correctColor : mistakeColor
+        const color_tip = (!selectIdx.includes(idx)) ? null : //该题目还没做 或 该选项未选中 时没有颜色
+            correctIdx.includes(idx) ? correctColor : mistakeColor
         const optionDiv = createEl('div', {
           innerText: content,
           className: 'option',
           isCorrect,
           style: {
-            // background: color_tip,
-            // borderLeft: `8px solid ${color_tip}`,
+            background: color_tip,
+            borderLeft: `8px solid ${color_tip}`,
           },
           onclick: function(e) {
             const _this = this
             const find_sel_idx = curQuestion.selectIdx.findIndex(id => id == idx)
 
-            if(curQuestion.correctIdx.length > 1) { //多选
+            if(isMutiSel) { //多选
               if(find_sel_idx !== -1) {
                 curQuestion.selectIdx.splice(find_sel_idx, 1)
               } else {
@@ -382,33 +383,25 @@
                 if(curQuestion.selectIdx.includes(idx)) {
                   const isCorrect =  curQuestion.correctIdx.includes(idx)
                   option.style.background = isCorrect ? correctColor : mistakeColor
+                  option.style.borderLeft = `8px solid ${isCorrect ? correctColor : mistakeColor}`
+
                 } else {
                   option.style.background = null
+                  option.style.borderLeft = `8px solid transparent`
                 }
-                
-                // if(item == _this) {
-                //   item.style.background = item.isCorrect ? correctColor : mistakeColor
-                //   item.style.borderLeft = `8px solid ${item.isCorrect ? correctColor : mistakeColor}`
-  
-                  
-                //   _ds.testing[sn-1].selectIdx = idx
-  
-                //   if(_this.isCorrect) {
-                //     setTimeout(()=> {
-                //       switchNextQuestion(sn)
-                //     }, 400)
-                //   }
-                // } else {
-                //   item.style.background = null
-                //   item.style.borderLeft = '8px solid transparent'
-                // }
-  
               })
 
-              localStorage.setItem('local_record', JSON.stringify(_ds.questionBanks))
-
-              // statistic()
             }
+            
+            if(!isMutiSel && curQuestion.correctIdx[0] === curQuestion.selectIdx[0]) {
+                setTimeout(()=> {
+                  switchNextQuestion(sn)
+                }, 400)
+            }
+
+            localStorage.setItem('local_record', JSON.stringify(_ds.questionBanks))
+
+            statistic()
           }
         })
         
@@ -418,14 +411,14 @@
     
     function switchNextQuestion(sn) {
       if (_ds.mode == 1) {
-        const next_idx = _ds.testing.findIndex((item, idx) => idx > sn - 1 && item.selectIdx === void 0)
+        const next_idx = _ds.testing.findIndex((item, idx) => idx > sn - 1 && item.selectIdx.length == 0)
         _ds.selIdx = next_idx
         _ds.lastQuestionIdx = void 0
 
       } else {
         let idx_range = []
         _ds.testing.forEach((item, idx) => {
-          if (item.selectIdx == void 0) idx_range.push(idx)
+          if (item.selectIdx.length == 0) idx_range.push(idx)
         })
         if (idx_range.length) {
           const random_idx = idx_range[randomNum(0, idx_range.length - 1)]
@@ -459,9 +452,11 @@
       }
 
       _ds.testing.forEach((item, idx) => {
-        if(item.selectIdx !== void 0) {
+        if(item.selectIdx.length !== 0) {
+          const isCollect = item.selectIdx.length == item.correctIdx.length && item.correctIdx.every((idx) => item.selectIdx.includes(idx))
+
           ++statistic.answer
-          ++statistic[item.correctIdx === item.selectIdx ? 'correct' : 'mistake']
+          ++statistic[isCollect ? 'correct' : 'mistake']
         }
         ++statistic.question
       })
