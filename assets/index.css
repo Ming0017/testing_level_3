@@ -105,6 +105,7 @@ header .operation-wrap {
 }
 
 .testing-wrap {
+  overflow: auto;
   height: 45vh;
   margin-top: 12px;
   padding: 10px;

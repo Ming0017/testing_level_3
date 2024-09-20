@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0" user-scalable="no">
-  <title>Level-Four</title>
+  <title>Level-Three</title>
   <link rel="stylesheet" href="./assets/index.css">
   <script src="./assets/utils.js"></script>
 </head>
@@ -73,7 +73,7 @@
         setTimeout(() => {
           const indexItems = $$('.index-item')
           if(_ds.mode == 1) {
-            const nextQuestion = indexItems.find(item => item.selectIdx === void 0)
+            const nextQuestion = indexItems.find(item => item.selectIdx.length == 0)
             if(nextQuestion) {
               nextQuestion.click()
             } else {
@@ -132,7 +132,7 @@
             }
             if(!collection.length) {
               alert('暂无被标记的题目，可尝试点击题目序号将其转为被标记状态。')
-              if(_ds.selTag == '标记') _ds.selTag = '四级'
+              if(_ds.selTag == '标记') _ds.selTag = '三级'
               return
             }
             _ds.testing = collection
@@ -179,7 +179,7 @@
         display: null
       })
 
-      tagList = ['四级', '五级', '标记']
+      tagList = ['三级', '标记']
       tagList.forEach(tagName => {
         const tag = createEl('div', {
           className: 'tag',
@@ -192,7 +192,7 @@
         $('.tag-wrap').append(tag)
       })
 
-      _ds.selTag = localStorage.getItem('selTag') ?? '四级'
+      _ds.selTag = localStorage.getItem('selTag') ?? '三级'
 
       $('.last-btn').onclick = function() {
         if(_ds.lastQuestionIdx !== void 0) {
@@ -221,8 +221,8 @@
 
       for(let sn = 1; sn <= questionBank.length; ++sn) {
         const curQuestion = questionBank[sn-1]
-        const correctIdx = curQuestion.correctIdx
-        const selectIdx = curQuestion.selectIdx
+        const {selectIdx, correctIdx} = curQuestion
+        const isCollect = selectIdx.length == correctIdx.length && correctIdx.every((idx) => selectIdx.includes(idx))
 
         const index = createEl('div', {
           className: 'index-item',
@@ -235,8 +235,8 @@
             this.selectIdx = questionBank[sn-1].selectIdx
           },
           style: {
-            background: selectIdx === void 0 ? null : 
-            curQuestion.selectIdx === correctIdx ? _ds.correctColor_index : _ds.mistakeColor_index
+            background: selectIdx.length === 0 ? null : 
+            isCollect ? _ds.correctColor_index : _ds.mistakeColor_index
           }
         })
         $('.index-wrap').append(index)
@@ -244,7 +244,7 @@
     }
 
     function dataLoad() {
-      const fetchMap = [['四级', './testing-data/level-four.json'], ['五级', './testing-data/level-five.json']]
+      const fetchMap = [['三级', './testing-data/level-three.json']]
       
       return Promise.all(fetchMap.map(([name, url]) => fetch(url).then(res => res.json())))
       .then(allRes => {
@@ -253,28 +253,27 @@
           let bank = questionBanks[fetchMap[idx][0]] = []
 
           res.map(({data}) => {
-            data.isCollect = false
-
+            const answer = data.answer.optionIdSet.split(',')
+            data.correctIdx = []
+            data.selectIdx = []
             data.optionList.some((option, idx) => {
-              const isCorrect = option.id == data.answer.optionIdSet
-              if(isCorrect) data.correctIdx = idx
-              option.isCorrect = isCorrect
+              const isCorrect = answer.find(optionIdSet => option.id == optionIdSet)
+              if(isCorrect) data.correctIdx.push(idx)
             })
             bank.push(data)
           })
         })
 
-        const version = localStorage.getItem('version')
-        if(version === _ds.version) {
-          const local_record = JSON.parse(localStorage.getItem('local_record'))
-          if(local_record) _ds.questionBanks = local_record
-        } else {
-          _ds.questionBanks = questionBanks
-          localStorage.setItem('local_record', JSON.stringify(_ds.questionBanks))
-          localStorage.setItem('version', _ds.version)
-        }
-
-
+        _ds.questionBanks = questionBanks
+        // const version = localStorage.getItem('version')
+        // if(version === _ds.version) {
+        //   const local_record = JSON.parse(localStorage.getItem('local_record'))
+        //   if(local_record) _ds.questionBanks = local_record
+        // } else {
+        //   _ds.questionBanks = questionBanks
+        //   localStorage.setItem('local_record', JSON.stringify(_ds.questionBanks))
+        //   localStorage.setItem('version', _ds.version)
+        // }
       })
     }
 
@@ -315,8 +314,17 @@
         innerText: content,
         className: 'question-info',
       })
+      const questionTip = createEl('span', {
+        innerText: '【多选】',
+        className: 'question-tip',
+        style: {
+          color: '#333',
+          fontWeight: '800',
+        }
+      })
 
       questionWrap.append(questionIndex, questionInfo)
+      if(curQuestion.correctIdx.length > 1) questionWrap.append(questionTip)
       testingWrap.append(questionWrap)
 
       indexItems.forEach((item, idx) => {
@@ -330,46 +338,81 @@
         })
       })
       
-      optionList.forEach(({content, isCorrect}, idx) => {
-        const color_tip = (selectIdx === void 0 || idx !== selectIdx) ? null : //该题目还没做 或 该选项未选中 时没有颜色
-            idx == correctIdx ? correctColor : mistakeColor
-        const option = createEl('div', {
+      optionList.forEach((option, idx) => {
+        let {content, isCorrect} = option
+        // const color_tip = (selectIdx === void 0 || idx !== selectIdx) ? null : //该题目还没做 或 该选项未选中 时没有颜色
+        //     idx == correctIdx ? correctColor : mistakeColor
+        const optionDiv = createEl('div', {
           innerText: content,
           className: 'option',
           isCorrect,
           style: {
-            background: color_tip,
-            borderLeft: `8px solid ${color_tip}`,
+            // background: color_tip,
+            // borderLeft: `8px solid ${color_tip}`,
           },
           onclick: function(e) {
             const _this = this
-            $$('.option').forEach((item, idx) => {
-              if(item == _this) {
-                item.style.background = item.isCorrect ? correctColor : mistakeColor
-                item.style.borderLeft = `8px solid ${item.isCorrect ? correctColor : mistakeColor}`
+            const find_sel_idx = curQuestion.selectIdx.findIndex(id => id == idx)
 
-                index_item_map.style.background = item.isCorrect ? _ds.correctColor_index : _ds.mistakeColor_index
-                
-                _ds.testing[sn-1].selectIdx = idx
-
-                if(_this.isCorrect) {
-                  setTimeout(()=> {
-                    switchNextQuestion(sn)
-                  }, 400)
-                }
+            if(curQuestion.correctIdx.length > 1) { //多选
+              if(find_sel_idx !== -1) {
+                curQuestion.selectIdx.splice(find_sel_idx, 1)
               } else {
-                item.style.background = null
-                item.style.borderLeft = '8px solid transparent'
+                curQuestion.selectIdx.push(idx)
               }
+            } else { //单选
+              if(find_sel_idx !== -1) {
+                curQuestion.selectIdx = [] //取消选中
+              } else {
+                curQuestion.selectIdx = [idx]
+              }
+            }
+            console.log(curQuestion.selectIdx)
+            render()
+            function render() {
+              const isCollect = curQuestion.selectIdx.length == correctIdx.length && correctIdx.every((idx) => curQuestion.selectIdx.includes(idx))
+              console.log(isCollect)
+              if(curQuestion.selectIdx.length) {
+                index_item_map.style.background = isCollect ? _ds.correctColor_index : _ds.mistakeColor_index
+              } else {
+                index_item_map.style.background = null
+              }
+
+              $$('.option').forEach((option, idx) => {
+                if(curQuestion.selectIdx.includes(idx)) {
+                  const isCorrect =  curQuestion.correctIdx.includes(idx)
+                  option.style.background = isCorrect ? correctColor : mistakeColor
+                } else {
+                  option.style.background = null
+                }
+                
+                // if(item == _this) {
+                //   item.style.background = item.isCorrect ? correctColor : mistakeColor
+                //   item.style.borderLeft = `8px solid ${item.isCorrect ? correctColor : mistakeColor}`
+  
+                  
+                //   _ds.testing[sn-1].selectIdx = idx
+  
+                //   if(_this.isCorrect) {
+                //     setTimeout(()=> {
+                //       switchNextQuestion(sn)
+                //     }, 400)
+                //   }
+                // } else {
+                //   item.style.background = null
+                //   item.style.borderLeft = '8px solid transparent'
+                // }
+  
+              })
 
               localStorage.setItem('local_record', JSON.stringify(_ds.questionBanks))
 
-              statistic()
-            })
+              // statistic()
+            }
           }
         })
         
-        testingWrap.append(option)
+        testingWrap.append(optionDiv)
       })
     }
     
